@@ -1,3 +1,7 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import os
 import json
 
@@ -24,11 +28,18 @@ def startup_vectorstore():
     embeddings = HuggingFaceEmbeddings()
     
     import chromadb
+    from chromadb.config import Settings
     
     if not os.path.exists(persist_directory):
         os.makedirs(persist_directory, exist_ok=True)
     
-    client = chromadb.PersistentClient(path=persist_directory)
+    client = chromadb.PersistentClient(
+        path=persist_directory,
+        settings=Settings(
+            anonymized_telemetry=False,
+            is_persistent=True
+        )
+    )
     
     vectorstore = Chroma(
         client=client,
