@@ -7,3 +7,7 @@ langchain-groq==0.1.9
 unstructured==0.16.23
 unstructured[pdf]==0.16.23
 nltk==3.8.1
+chromadb==0.4.22
+sentence-transformers
+python-magic-bin
+pdfminer.six
