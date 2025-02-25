@@ -6,7 +6,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationRetrievalChain
+from langchain.chains.conversational_retrieval.base import ConversationalRetrievalChain
+from langchain.prompts import PromptTemplate
 
 # Load config
 working_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,12 +39,30 @@ def chat_chain(vectorstore):
         return_messages=True
     )
 
-    chain = ConversationRetrievalChain.from_llm(
+    qa_template = """Eres DrCecim, un asistente médico virtual especializado en proporcionar información acerca de la Facultad de Mediciona de la Universidad de Buenos Aires. 
+        Debes:
+        - Responder preguntas de manera clara y comprensible
+        - Citar fuentes el pdf de donde sacaste la información
+        - Ser siempre amigable y compañero
+        - Mantener un tono profesional pero amigable
+
+        Contexto: {context}
+        Historial del chat: {chat_history}
+        Pregunta humana: {question}
+        Respuesta del asistente:"""
+
+    prompt = PromptTemplate(
+        input_variables=["context", "chat_history", "question"],
+        template=qa_template
+    )
+
+    chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
         chain_type="stuff",
         verbose=True,
-        return_source_documents=True
+        return_source_documents=True,
+        combine_docs_chain_kwargs={"prompt": prompt}
     )
     return chain
 
@@ -77,9 +96,12 @@ if user_input:
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        response = st.session_state.conversational_chain({"question": user_input})
+        response = st.session_state.conversational_chain({
+            "question": user_input,
+            "chat_history": st.session_state.chat_history
+        })
         assistant_message = response["answer"]
         st.markdown(assistant_message)
-        st.session_state.chat_history.append({"role": "assistant", "content": assistant_message})
+        st.session_state.messages.append({"role": "assistant", "content": assistant_message})
         
         
