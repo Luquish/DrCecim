@@ -2,4 +2,6 @@ build-essential
 poppler-utils
 python3-dev
 tesseract-ocr
-libtesseract-dev 
+libtesseract-dev
+sqlite3
+libsqlite3-dev 

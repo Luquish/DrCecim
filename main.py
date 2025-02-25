@@ -22,9 +22,23 @@ os.environ["GROQ_API_KEY"] = groq_api_key
 def startup_vectorstore():
     persist_directory = os.path.join(working_dir, "vector_db_dir")
     embeddings = HuggingFaceEmbeddings()
+    
+    # Configuración específica para ChromaDB
+    from chromadb.config import Settings
+    
+    client_settings = Settings(
+        chroma_db_impl="duckdb+parquet",
+        persist_directory=persist_directory,
+        anonymized_telemetry=False
+    )
+    
+    if not os.path.exists(persist_directory):
+        os.makedirs(persist_directory, exist_ok=True)
+    
     vectorstore = Chroma(
         embedding_function=embeddings,
-        persist_directory=persist_directory
+        persist_directory=persist_directory,
+        client_settings=client_settings
     )
     return vectorstore
 
@@ -66,7 +80,7 @@ def chat_chain(vectorstore):
     )
     return chain
 
-st.set_page_config(page_title="DrCecim Chatbot Demo",
+st.set_page_config(page_title="🥼 DrCecim Chatbot Demo",
                    page_icon="🥼",
                    layout="centered")
 
