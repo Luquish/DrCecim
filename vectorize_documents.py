@@ -4,7 +4,8 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from chromadb.config import Settings
+import shutil
+import os
 
 # Initialize embeddings
 print("Inicializando embeddings...")
@@ -41,11 +42,16 @@ print(f"Documentos divididos en {len(chunks)} fragmentos.")
 
 # Create Chroma database
 print("Creando base de datos Chroma...")
+
+# Limpiar directorio de la base de datos si existe
+if os.path.exists("vector_db_dir"):
+    shutil.rmtree("vector_db_dir")
+
+# Crear nueva instancia de Chroma con configuración específica
 db = Chroma.from_documents(
     documents=chunks,
     embedding=embeddings,
     persist_directory="vector_db_dir",
-    collection_metadata={"hnsw:space": "cosine"}  # Usar similitud coseno
 )
 print("Base de datos Chroma creada y datos persistidos.")
 
