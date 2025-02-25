@@ -23,22 +23,17 @@ def startup_vectorstore():
     persist_directory = os.path.join(working_dir, "vector_db_dir")
     embeddings = HuggingFaceEmbeddings()
     
-    # Configuración específica para ChromaDB
-    from chromadb.config import Settings
-    
-    client_settings = Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=persist_directory,
-        anonymized_telemetry=False
-    )
+    import chromadb
     
     if not os.path.exists(persist_directory):
         os.makedirs(persist_directory, exist_ok=True)
     
+    client = chromadb.PersistentClient(path=persist_directory)
+    
     vectorstore = Chroma(
+        client=client,
         embedding_function=embeddings,
-        persist_directory=persist_directory,
-        client_settings=client_settings
+        persist_directory=persist_directory
     )
     return vectorstore
 
