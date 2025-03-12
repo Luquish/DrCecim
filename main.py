@@ -112,7 +112,7 @@ def chat_chain(vectorstore):
     - **No repetir saludos:** Solo podes saludar o preguntar como esta la persona (usuario) en el primer mensaje. Tenes prohibido volver a saludar en los mensajes posteriores.
     - **Tono y Estilo:** Responde en un tono cercano, amigable y genuinamente argentino. Utiliza expresiones coloquiales (por ejemplo, "dale", "de una", "bancame", "laburar", "re") y emojis (😊👩‍⚕️🏥📚) para hacer la conversación más dinámica.
     - **Ámbito y Contenido:** Atiende exclusivamente preguntas orientativas y administrativas relacionadas con la facultad. Si la consulta se adentra en temas médicos o de salud, indica amablemente que no podés ayudar y sugiere consultar a un profesional (ej.: "Te recomiendo consultar a un especialista.").
-    - **Referencias y Fuentes:** Si la respuesta se fundamenta en la información de la base de datos o en documentos oficiales, menciona la fuente utilizando el formato: [Fuente: Nombre_del_documento]. Por ejemplo, [Fuente: Condiciones_Regularidad.pdf] o [Fuente: Regimen_Disciplinario.pdf], según corresponda.
+    - **Referencias y Fuentes:** IMPORTANTE: Cuando uses información de los documentos recuperados, SIEMPRE menciona la fuente. Para cada documento que uses, extrae el nombre del archivo del campo "filename" en los metadatos y cítalo usando el formato: [Fuente: nombre_del_archivo]. Si usas múltiples fuentes, cítalas todas separadas por comas.
     - **Claridad y Organización:** Estructura la respuesta en párrafos cortos y, cuando sea necesario, utiliza listas con viñetas (añadiendo un emoji al final de cada punto) para mejorar la legibilidad.
     - **Ambigüedad:** Si la pregunta resulta ambigua o incompleta, pide más detalles con frases como: "¿Podrías especificar un poco más a qué te referís?"
     - **Sin informacion:** Si no tenés información sobre la pregunta, decile al usuario que no tenés información al respecto y proporciona el correo de contacto de la facultad: drcecim@uba.com
@@ -193,7 +193,7 @@ st.set_page_config(page_title="DrCecim Chatbot Demo",
                    page_icon="🥼",
                    layout="centered")
 
-st.title("🥼 DrCecim Chatbot Demo")
+st.title("🥼 DrCecim")
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -242,7 +242,13 @@ if user_input:
             assistant_message = response["answer"]
             
             # Store source documents for reference
-            sources = [doc.metadata.get("source", "desconocido") for doc in response.get("source_documents", [])]
+            source_docs = response.get("source_documents", [])
+            sources = [doc.metadata.get("source", doc.metadata.get("filename", "desconocido")) 
+                      for doc in source_docs]
+            
+            # Opcional: Puedes mostrar las fuentes utilizadas en la interfaz
+            if sources and sources[0] != "desconocido":
+                st.caption(f"Fuentes consultadas: {', '.join(sources)}")
             
             st.markdown(assistant_message)
             st.session_state.messages.append({"role": "assistant", "content": assistant_message})
