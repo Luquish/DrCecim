@@ -1,4 +1,3 @@
-# vectorize_documents.py
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -9,33 +8,35 @@ import os
 import datetime
 import hashlib
 
-# Initialize embeddings
+# Inicializar embeddings
 print("Inicializando embeddings...")
-# Using a better model for domain-specific knowledge
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Considera utilizar un modelo especializado en textos legales si está disponible.
+embeddings = HuggingFaceEmbeddings(model_name="dccuchile/bert-base-spanish-wwm-cased")
 print("Embeddings inicializados.")
 
-# Load documents
+# Cargar documentos desde el directorio 'data'
 print("Cargando documentos desde el directorio 'data'...")
-loader = DirectoryLoader(path="data",
-                        glob="**/*.pdf",  # Include subdirectories
-                        loader_cls=UnstructuredFileLoader,
-                        show_progress=True)
+loader = DirectoryLoader(
+    path="data",
+    glob="**/*.pdf",  # Incluir subdirectorios
+    loader_cls=UnstructuredFileLoader,
+    show_progress=True
+)
 
 documents = loader.load()
 print(f"Documentos cargados: {len(documents)} documentos encontrados.")
 
-# Extract metadata from filenames and content
+# Función para extraer y enriquecer la metadata de cada documento
 def extract_metadata(doc, idx):
-    # Generate a unique ID for the document
+    # Generar un ID único basado en el contenido (se puede ajustar según el caso)
     doc_id = hashlib.md5(doc.page_content.encode()).hexdigest()[:10]
     
-    # Extract filename from source if available
+    # Extraer el nombre del archivo si está disponible en la metadata
     filename = "unknown"
     if hasattr(doc, 'metadata') and 'source' in doc.metadata:
         filename = os.path.basename(doc.metadata['source'])
     
-    # Create enriched metadata
+    # Crear metadata enriquecida
     metadata = {
         "doc_id": doc_id,
         "chunk_id": idx,
@@ -45,57 +46,63 @@ def extract_metadata(doc, idx):
         "created_at": datetime.datetime.now().isoformat(),
     }
     
-    # Preserve any existing metadata
+    # Conservar cualquier metadata existente en el documento
     if hasattr(doc, 'metadata'):
         metadata.update(doc.metadata)
         
     return metadata
 
-# Enrich documents with metadata
+# Enriquecer cada documento con su metadata correspondiente
 for i, doc in enumerate(documents):
     doc.metadata.update(extract_metadata(doc, i))
 
-# Split documents into chunks using recursive splitter for better semantic chunking
+# Dividir documentos en fragmentos usando un splitter que respete la estructura legal
 print("Dividiendo documentos en fragmentos...")
+# Se añaden separadores para mantener la integridad de los artículos y párrafos
+separators = ["\nArt. ", "\n\n", "\n", ". ", " ", ""]
+# Ajustar chunk_size a 600 para conservar secciones completas, modificable según necesidad
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=400,          # Smaller chunks for more precise retrieval
-    chunk_overlap=100,       # Larger overlap to maintain context between chunks
-    separators=["\n\n", "\n", ". ", " ", ""],  # Try to split on paragraphs first
+    chunk_size=600,          # Tamaño del fragmento ajustado para textos legales
+    chunk_overlap=100,       # Solapamiento para mantener continuidad entre fragmentos
+    separators=separators,
     length_function=len,
 )
 
 chunks = text_splitter.split_documents(documents)
 print(f"Documentos divididos en {len(chunks)} fragmentos.")
 
-# Update metadata for each chunk
+# Actualizar metadata de cada fragmento con información adicional
 for i, chunk in enumerate(chunks):
-    # Preserve original document metadata but update chunk-specific info
     chunk.metadata.update({
         "chunk_id": i,
         "total_chunks": len(chunks)
     })
 
-# Create Chroma database
+# Crear base de datos Chroma para almacenar los embeddings
 print("Creando base de datos Chroma...")
 
-# Create backup of existing database if it exists
+# Si ya existe una base de datos, hacer backup y eliminar la anterior
 if os.path.exists("vector_db_dir"):
     backup_dir = f"vector_db_backup_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     print(f"Creando backup de la base de datos existente en {backup_dir}...")
     shutil.copytree("vector_db_dir", backup_dir)
     shutil.rmtree("vector_db_dir")
 
-# Create new Chroma instance with specific configuration
 db = Chroma.from_documents(
     documents=chunks,
     embedding=embeddings,
     persist_directory="vector_db_dir",
-    collection_metadata={"hnsw:space": "cosine"}  # Using cosine similarity
+    collection_metadata={
+        "hnsw:space": "cosine",
+        "hnsw:construction_ef": 128,  # Aumenta para mayor precisión en la construcción del índice
+        "hnsw:search_ef": 96,         # Aumenta para búsquedas más precisas
+        "hnsw:M": 16                  # Aumenta las conexiones por nodo
+    }
 )
 
 print("Base de datos Chroma creada y datos persistidos.")
 
-# Print some statistics
+# Imprimir estadísticas de la vectorización
 print(f"Estadísticas de vectorización:")
 print(f"- Documentos procesados: {len(documents)}")
 print(f"- Fragmentos creados: {len(chunks)}")
