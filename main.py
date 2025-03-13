@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import sys
 
 import streamlit as st
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -16,6 +17,10 @@ from langchain_community.retrievers import BM25Retriever
 from langchain.schema import Document
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
+
+# Solución para SQLite en Streamlit Cloud
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 st.set_page_config(page_title="DrCecim Chatbot Demo",
                    page_icon="🥼",
