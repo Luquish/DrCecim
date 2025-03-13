@@ -36,7 +36,6 @@ working_dir = os.path.dirname(os.path.abspath(__file__))
 try:
     groq_api_key = st.secrets["api_keys"]["GROQ_API_KEY"]
     cohere_api_key = st.secrets["api_keys"]["COHERE_API_KEY"]
-    st.sidebar.info("Claves API cargadas desde config.json")
 except (KeyError, FileNotFoundError):
     st.error("Error: No se pudieron cargar las claves API desde Streamlit Secrets.")
     st.info("Por favor, configura tus claves API en la sección de Secrets en Streamlit Cloud.")
