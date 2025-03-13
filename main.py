@@ -17,13 +17,32 @@ from langchain.schema import Document
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 
-# Load config
+st.set_page_config(page_title="DrCecim Chatbot Demo",
+                   page_icon="🥼",
+                   layout="centered")
+
+st.title("🥼 DrCecim")
+
+# Definir working_dir al inicio, antes de cargar las claves
 working_dir = os.path.dirname(os.path.abspath(__file__))
 
-config_data = json.load(open(os.path.join(working_dir, "config.json")))
+# Configuración de claves API
+# Intenta obtener las claves de Streamlit Secrets primero, luego del config.json como respaldo
+try:
+    groq_api_key = st.secrets["api_keys"]["GROQ_API_KEY"]
+    cohere_api_key = st.secrets["api_keys"]["COHERE_API_KEY"]
+except (KeyError, FileNotFoundError):
+    try:
+        # Fallback a config.json para desarrollo local
+        config_data = json.load(open(os.path.join(working_dir, "config.json")))
+        groq_api_key = config_data["GROQ_API_KEY"]
+        cohere_api_key = config_data["COHERE_API_KEY"]
+        st.sidebar.info("Claves API cargadas desde config.json")
+    except (FileNotFoundError, KeyError) as e:
+        st.error(f"Error al cargar las claves API: {str(e)}")
+        st.stop()
 
-groq_api_key = config_data["GROQ_API_KEY"]
-
+# Configurar la variable de entorno para Groq
 os.environ["GROQ_API_KEY"] = groq_api_key
 
 # Initialize embeddings
@@ -92,7 +111,7 @@ def chat_chain(vectorstore):
     
     # Si tienes acceso a Cohere o similar
     compressor = CohereRerank(
-        cohere_api_key=config_data["COHERE_API_KEY"],
+        cohere_api_key=cohere_api_key,
         model="rerank-multilingual-v3.0"
     )
     retriever = ContextualCompressionRetriever(
@@ -189,11 +208,15 @@ def chat_chain(vectorstore):
     # Devuelve chain_with_history en lugar de chain
     return chain_with_history
 
-st.set_page_config(page_title="DrCecim Chatbot Demo",
-                   page_icon="🥼",
-                   layout="centered")
 
-st.title("🥼 DrCecim")
+def ensure_vectorstore_exists():
+    persist_directory = os.path.join(working_dir, "vector_db_dir")
+    if not os.path.exists(persist_directory) or not os.listdir(persist_directory):
+        st.warning("Base de datos vectorial no encontrada. Reconstruyendo...")
+        # Importa y ejecuta tu script de vectorización
+        import vectorize_documents
+        vectorize_documents.main()
+    return startup_vectorstore()
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -201,11 +224,18 @@ if "chat_history" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
     
-if "vectorstore" not in st.session_state:
-    st.session_state.vectorstore = startup_vectorstore()
-
-if "conversational_chain" not in st.session_state:
-    st.session_state.conversational_chain = chat_chain(st.session_state.vectorstore)
+try:
+    if "vectorstore" not in st.session_state:
+        with st.spinner("Inicializando base de datos vectorial..."):
+            st.session_state.vectorstore = ensure_vectorstore_exists()
+            
+    if "conversational_chain" not in st.session_state:
+        with st.spinner("Configurando el modelo de lenguaje..."):
+            st.session_state.conversational_chain = chat_chain(st.session_state.vectorstore)
+except Exception as e:
+    st.error(f"Error al inicializar: {str(e)}")
+    st.info("Asegúrate de que la base de datos vectorial esté disponible o ejecuta primero el script de vectorización.")
+    st.stop()
 
 if "last_interaction_time" not in st.session_state:
     st.session_state.last_interaction_time = time.time()
@@ -246,9 +276,7 @@ if user_input:
             sources = [doc.metadata.get("source", doc.metadata.get("filename", "desconocido")) 
                       for doc in source_docs]
             
-            # Opcional: Puedes mostrar las fuentes utilizadas en la interfaz
-            if sources and sources[0] != "desconocido":
-                st.caption(f"Fuentes consultadas: {', '.join(sources)}")
             
             st.markdown(assistant_message)
             st.session_state.messages.append({"role": "assistant", "content": assistant_message})
+
